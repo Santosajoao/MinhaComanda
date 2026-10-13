@@ -1,0 +1,21 @@
+# Sobe apenas o PostgreSQL para desenvolvimento local:  docker compose up -d
+services:
+  db:
+    image: postgres:16
+    container_name: comandas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: comandas
+      POSTGRES_PASSWORD: comandas
+      POSTGRES_DB: comandas
+    ports:
+      - "5433:5432"
+    volumes:
+      - comandas-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comandas -d comandas"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  comandas-data:
