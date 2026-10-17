@@ -22,10 +22,16 @@ A regra central: **cada comanda tem o seu próprio número; nome e CPF são apen
 Não é preciso instalar mais nada (as bibliotecas são baixadas pelo `npm install`).
 Windows, macOS e Linux funcionam. No Windows use o **PowerShell** ou o **Prompt de Comando**.
 
+## Documentação técnica completa
+
+Toda a documentação do código está na pasta [`docs/`](docs/00-INDICE.md): arquitetura, banco de dados, módulos do backend, referência da API, regras de negócio, frontend, segurança/LGPD, testes, operação/manutenção e registro de decisões. O histórico de mudanças fica em [`CHANGELOG.md`](CHANGELOG.md).
+
 ## 2. Estrutura de pastas
 
 ```
 comandas/
+├── docs/                  # documentação técnica completa (comece por docs/00-INDICE.md)
+├── CHANGELOG.md           # registro de mudanças
 ├── docker-compose.yml     # PostgreSQL pronto para uso (Opção A)
 ├── backend/               # API (NestJS)
 │   ├── migrations/        # SQL do banco (tabelas, triggers de integridade, função de totais)
@@ -33,7 +39,7 @@ comandas/
 │   │                      # adjustments, checkout, payments, cash-register, audit, reports
 │   ├── src/database/      # migrate / seed / reset
 │   └── test/e2e.mjs       # testes automatizados de ponta a ponta
-└── frontend/              # Interface web (Next.js)
+└── frontend/              # Interface web (Next.js); tests/ui_smoke.py = roteiro opcional de interface
 ```
 
 ## 3. Passo a passo para rodar
@@ -146,7 +152,7 @@ São 82 verificações: autenticação, permissões, abertura/duplicidade, CPF, 
 |---|---|
 | `ECONNREFUSED 127.0.0.1:5432` | O PostgreSQL não está rodando. Docker: `docker compose up -d`. Instalado: inicie o serviço. |
 | `password authentication failed` | Usuário/senha diferentes do `DATABASE_URL` em `backend/.env`. |
-| `port 5432 is already in use` | Já existe um PostgreSQL local. Use a Opção B, ou mude a porta em `docker-compose.yml` (ex.: `"5433:5432"`) e em `DATABASE_URL`. |
+| `role "comandas" não existe`, `Connection terminated unexpectedly` ou `port 5432 is already in use` | Provavelmente já há um PostgreSQL instalado no Windows usando a porta 5432 (confira com `netstat -ano \| findstr :5432`). Mude o Docker para a porta 5433: no `docker-compose.yml` use exatamente `"5433:5432"` (a porta de dentro do contêiner continua 5432) e em `backend/.env` use `...@localhost:5433/comandas`. Depois `docker compose down`, `docker compose up -d` e `npm run db:setup`. O `docker compose ps` deve mostrar `0.0.0.0:5433->5432/tcp`. |
 | `EADDRINUSE :3001` ou `:3000` | Porta ocupada. Mude `PORT` em `backend/.env` (e `NEXT_PUBLIC_API_URL` em `frontend/.env.local`, e `CORS_ORIGIN` se mudar a porta da interface). |
 | Tela de login diz "Sem conexão com o servidor" | A API não está rodando ou `NEXT_PUBLIC_API_URL` está errado. Reinicie o `npm run dev` do frontend após editar `.env.local`. |
 | `Variável de ambiente ... não definida` | Faltou copiar `.env.example` para `.env`. |

@@ -1,0 +1,76 @@
+# Roteiro opcional de interface (Playwright). Requer API e frontend rodando, banco semeado e NEXT_PUBLIC_DEMO_LOGINS=true.
+# Uso: pip install playwright && playwright install chromium && python frontend/tests/ui_smoke.py
+import re, sys
+from playwright.sync_api import sync_playwright
+
+BASE = "http://localhost:3000"
+errors = []
+def login(page, role):
+    page.evaluate("localStorage.clear()")
+    page.goto(BASE + "/login")
+    page.get_by_role("button", name=role, exact=True).click()
+    page.get_by_role("button", name="Entrar").click()
+    page.wait_for_url(BASE + "/")
+    page.get_by_text("Olá,").wait_for()
+
+with sync_playwright() as p:
+    b = p.chromium.launch()
+    page = b.new_page(viewport={"width": 1400, "height": 900})
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    page.goto(BASE + "/login")
+    login(page, "recepcao")
+    page.goto(BASE + "/recepcao")
+    page.get_by_label("Nome do consumidor").fill("Maria Teste UI")
+    page.get_by_label(re.compile("CPF")).fill("111.444.777-35")
+    page.get_by_role("button", name="Confirmar abertura").click()
+    page.get_by_text("Comanda aberta", exact=True).wait_for()
+    number = page.locator(".big").first.inner_text().strip()
+    print("comanda aberta:", number)
+    page.screenshot(path="shot_recepcao.png")
+
+    login(page, "atendente")
+    page.goto(BASE + "/consumo")
+    page.get_by_label("Número da comanda").fill(number)
+    page.get_by_role("button", name="Buscar").click()
+    page.get_by_text("Maria Teste UI").wait_for()
+    page.locator(".prod", has_text="Cerveja Long Neck").click()
+    page.locator(".prod", has_text="Cerveja Long Neck").click()
+    page.locator(".prod", has_text="Porção de Fritas").click()
+    page.get_by_role("button", name="Confirmar lançamento").click()
+    page.get_by_text("Itens lançados").wait_for()
+    page.get_by_text("R$ 68,00").first.wait_for()   # 2x15 + 38
+    print("consumo ok: R$ 68,00")
+    page.screenshot(path="shot_consumo.png")
+
+    login(page, "caixa")
+    page.goto(BASE + f"/caixa?n={number}")
+    page.get_by_text("Seu caixa está fechado").wait_for()
+    page.get_by_role("button", name="Abrir caixa").click()
+    page.get_by_text("Caixa aberto", exact=False).first.wait_for()
+    page.get_by_role("button", name="Iniciar conferência").click()
+    page.get_by_text("Em conferência").first.wait_for()
+    page.get_by_label("Forma").select_option("pix")
+    page.get_by_label("Referência da transação (NSU / ID Pix)").fill("E2026UI0001")
+    page.get_by_role("button", name="Registrar pagamento").click()
+    page.get_by_text("Pagamento registrado").wait_for()
+    page.get_by_text("Paga", exact=True).first.wait_for()
+    page.screenshot(path="shot_caixa.png")
+    page.get_by_role("button", name="Encerrar comanda").click()
+    page.get_by_text("Comanda encerrada").first.wait_for()
+    page.get_by_text("Encerrada", exact=True).first.wait_for()
+    print("fluxo de caixa ok: paga e encerrada")
+
+    login(page, "gerente")
+    page.goto(BASE + "/relatorios")
+    page.get_by_text("Vendas (consumo válido)").wait_for()
+    page.get_by_text("Cerveja Long Neck").first.wait_for()
+    page.screenshot(path="shot_rel.png", full_page=True)
+    page.goto(BASE + "/auditoria"); page.get_by_text("tab.open").first.wait_for()
+    page.goto(BASE + "/produtos"); page.get_by_text("Caipirinha").first.wait_for()
+    page.goto(BASE + "/usuarios"); page.get_by_text("caixa@exemplo.com").wait_for()
+    page.goto(BASE + "/config"); page.get_by_text("Estabelecimento e regras").wait_for()
+    page.goto(BASE + "/comandas"); page.get_by_text(number).first.wait_for()
+    print("telas de gestão ok")
+    b.close()
+print("ERROS DE CONSOLE:", [e for e in errors if "favicon" not in e] or "nenhum")
